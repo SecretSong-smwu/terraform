@@ -13,3 +13,7 @@ provider "aws" {
   region  = "ap-northeast-2"
   profile = "secretsong"
 }
+
+module "query_automation" {
+  source = "../../modules/query-automation"
+}
