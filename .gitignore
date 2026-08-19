@@ -26,3 +26,4 @@ terraform.rc
 # Editor
 .vscode/
 .idea/
+**/build/
