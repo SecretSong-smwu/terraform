@@ -20,3 +20,20 @@ resource "aws_lambda_function" "get_security_logs" {
     }
   }
 }
+
+data "archive_file" "get_risk_analysis" {
+  type        = "zip"
+  source_dir  = "${path.module}/src/get_risk_analysis"
+  output_path = "${path.module}/build/get_risk_analysis.zip"
+}
+
+resource "aws_lambda_function" "get_risk_analysis" {
+  function_name    = "GetRiskAnalysis-secretsong"
+  role             = aws_iam_role.agent_query_lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  timeout          = 3
+  memory_size      = 128
+  filename         = data.archive_file.get_risk_analysis.output_path
+  source_code_hash = data.archive_file.get_risk_analysis.output_base64sha256
+}
