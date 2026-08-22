@@ -1,0 +1,98 @@
+{
+  "Comment": "SecretSong Security Monitoring & SOAR Workflow",
+  "StartAt": "RefreshData",
+  "States": {
+    "RefreshData": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${refresh_data_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.refreshResult",
+      "Next": "WaitForData"
+    },
+    "WaitForData": {
+      "Type": "Wait",
+      "Seconds": 10,
+      "Next": "GetRiskAnalysis"
+    },
+    "GetRiskAnalysis": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${get_risk_analysis_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.riskResult",
+      "Next": "CheckRiskLevel"
+    },
+    "CheckRiskLevel": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.riskResult.Payload.analysis.risk_level",
+          "StringEquals": "HIGH",
+          "Next": "RequestApproval"
+        },
+        {
+          "Variable": "$.riskResult.Payload.analysis.risk_level",
+          "StringEquals": "MEDIUM",
+          "Next": "MediumRiskResponse"
+        }
+      ],
+      "Default": "NoActionNeeded"
+    },
+    "RequestApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish.waitForTaskToken",
+      "Parameters": {
+        "TopicArn": "${sns_topic_arn}",
+        "Message.$": "States.Format('🚨 보안 위협 감지\n\nIP: {}\n위험도: {}\n사유: {}\n권장조치: {}\n\n✅ 승인(IP 차단): ${approve_url}?token={}\n\n❌ 거부: ${reject_url}?token={}', $.riskResult.Payload.analysis.src_ip, $.riskResult.Payload.analysis.risk_level, $.riskResult.Payload.analysis.reason, $.riskResult.Payload.analysis.recommended_action, States.Base64Encode($$.Task.Token), States.Base64Encode($$.Task.Token))"
+      },
+      "TimeoutSeconds": 300,
+      "ResultPath": "$.approvalResult",
+      "Next": "BlockIP",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.Timeout"],
+          "ResultPath": "$.errorInfo",
+          "Next": "ApprovalTimedOut"
+        },
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "ResultPath": "$.errorInfo",
+          "Next": "ApprovalRejected"
+        }
+      ]
+    },
+    "BlockIP": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${block_ip_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.blockResult",
+      "End": true
+    },
+    "MediumRiskResponse": {
+      "Type": "Pass",
+      "Comment": "필요시 알림 로직 연결",
+      "End": true
+    },
+    "NoActionNeeded": {
+      "Type": "Succeed"
+    },
+    "ApprovalTimedOut": {
+      "Type": "Fail",
+      "Error": "ApprovalTimeout",
+      "Cause": "5분 내 승인/거부 응답이 없었습니다."
+    },
+    "ApprovalRejected": {
+      "Type": "Fail",
+      "Error": "ApprovalRejected",
+      "Cause": "담당자가 IP 차단을 거부했습니다."
+    }
+  }
+}
