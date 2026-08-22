@@ -19,5 +19,6 @@ provider "aws" {
 }
 
 module "query_automation" {
-  source = "../../modules/query-automation"
+  source         = "../../modules/query-automation"
+  approval_email = var.approval_email
 }
