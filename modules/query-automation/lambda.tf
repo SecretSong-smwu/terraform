@@ -79,3 +79,20 @@ resource "aws_lambda_permission" "approval_processor_apigw" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "arn:aws:execute-api:ap-northeast-2:054422645032:zjt0xxkz9d/*/GET/*"
 }
+
+data "archive_file" "block_ip" {
+  type        = "zip"
+  source_dir  = "${path.module}/src/block_ip"
+  output_path = "${path.module}/build/block_ip.zip"
+}
+
+resource "aws_lambda_function" "block_ip" {
+  function_name    = "BlockIP-secretsong"
+  role             = aws_iam_role.agent_query_lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  timeout          = 3
+  memory_size      = 128
+  filename         = data.archive_file.block_ip.output_path
+  source_code_hash = data.archive_file.block_ip.output_base64sha256
+}
