@@ -22,3 +22,7 @@ module "query_automation" {
   source         = "../../modules/query-automation"
   approval_email = var.approval_email
 }
+
+module "data_pipeline" {
+  source = "../../modules/data-pipeline"
+}
